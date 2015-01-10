@@ -39,6 +39,9 @@ Criteo Release
    YARN-3251. Fixed a deadlock in CapacityScheduler when computing
    absoluteMaxAvailableCapacity in LeafQueue (Craig Welch via wangda)
 
+    YARN-3014. Replaces labels on a host should update all NM's labels on that
+    host. (Wangda Tan via jianhe)
+
 Release 2.6.0 - 2014-11-18
 
   INCOMPATIBLE CHANGES
