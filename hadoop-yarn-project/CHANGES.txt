@@ -2,6 +2,9 @@ Hadoop YARN Change Log
 
 Criteo Release
 
+   YARN-3092. Created a common ResourceUsage class to track labeled resource
+   usages in Capacity Scheduler. (Wangda Tan via jianhe)
+
    YARN-4250. NPE in AppSchedulingInfo#isRequestLabelChanged.
    (Brahma Reddy Battula via rohithsharmaks)
 
