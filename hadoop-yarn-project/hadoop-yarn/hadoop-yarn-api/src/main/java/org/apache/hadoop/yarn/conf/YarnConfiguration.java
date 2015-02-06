@@ -1494,6 +1494,14 @@ public class YarnConfiguration extends Configuration {
   public static final long
       DEFAULT_TIMELINE_SERVICE_CLIENT_RETRY_INTERVAL_MS = 1000;
 
+  /** Timeline client policy for whether connections are fatal */
+  public static final String TIMELINE_SERVICE_CLIENT_BEST_EFFORT =
+      TIMELINE_SERVICE_CLIENT_PREFIX + "best-effort";
+
+  public static final boolean
+      DEFAULT_TIMELINE_SERVICE_CLIENT_BEST_EFFORT = false;
+
+
   ////////////////////////////////
   // Other Configs
   ////////////////////////////////
@@ -1572,7 +1580,7 @@ public class YarnConfiguration extends Configuration {
   public static final String YARN_HTTP_POLICY_KEY = YARN_PREFIX + "http.policy";
   public static final String YARN_HTTP_POLICY_DEFAULT = HttpConfig.Policy.HTTP_ONLY
       .name();
-  
+
   public static final String NODE_LABELS_PREFIX = YARN_PREFIX + "node-labels.";
 
   /**
@@ -1581,7 +1589,7 @@ public class YarnConfiguration extends Configuration {
    */
   public static final String RM_NODE_LABELS_MANAGER_CLASS = NODE_LABELS_PREFIX
       + "manager-class";
-  
+
   /** URI for NodeLabelManager */
   public static final String FS_NODE_LABELS_STORE_ROOT_DIR = NODE_LABELS_PREFIX
       + "fs-store.root-dir";
