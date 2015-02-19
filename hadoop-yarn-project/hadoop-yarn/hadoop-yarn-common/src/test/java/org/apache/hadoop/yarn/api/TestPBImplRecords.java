@@ -1017,4 +1017,15 @@ public class TestPBImplRecords {
     validatePBImplRecord(CheckForDecommissioningNodesResponsePBImpl.class,
         CheckForDecommissioningNodesResponseProto.class);
   }
+
+  public void testGetLabelsToNodesRequestPBImpl() throws Exception {
+    validatePBImplRecord(GetLabelsToNodesRequestPBImpl.class,
+        GetLabelsToNodesRequestProto.class);
+  }
+
+  @Test
+  public void testGetLabelsToNodesResponsePBImpl() throws Exception {
+    validatePBImplRecord(GetLabelsToNodesResponsePBImpl.class,
+        GetLabelsToNodesResponseProto.class);
+  }
 }
