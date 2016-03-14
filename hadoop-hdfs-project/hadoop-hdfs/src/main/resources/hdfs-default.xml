@@ -2578,6 +2578,14 @@
 </property>
 
 <property>
+  <name>dfs.namenode.lease-max-files-checked-per-iteration</name>
+  <value>1000</value>
+  <description>The maximum number of files checked each time
+    LeaseManager.Monitor check for expired lease.
+  </description>
+</property>
+
+<property>
   <name>dfs.namenode.startup.delay.block.deletion.sec</name>
   <value>0</value>
   <description>The delay in seconds at which we will pause the blocks deletion

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.apache.hadoop.conf.Configuration;
 
 import java.util.ArrayList;
 
@@ -38,6 +39,8 @@ import static org.mockito.Mockito.*;
 public class TestLeaseManager {
   @Rule
   public Timeout timeout = new Timeout(300000);
+
+  public static int maxFilesLeasesCheckedForRelease = 100;
 
   @Test
   public void testRemoveLeases() throws Exception {
@@ -57,27 +60,34 @@ public class TestLeaseManager {
     assertEquals(0, lm.getINodeIdWithLeases().size());
   }
 
-  /** Check that even if LeaseManager.checkLease is not able to relinquish
-   * leases, the Namenode does't enter an infinite loop while holding the FSN
-   * write lock and thus become unresponsive
+  /** Check that LeaseManager.checkLease won't try
+   *  to release more than the maxFilesCheckedForRelease
+   *  per iteration
    */
   @Test
-  public void testCheckLeaseNotInfiniteLoop() {
+  public void testCheckLeaseStopReleasedLeases() {
     LeaseManager lm = new LeaseManager(makeMockFsNameSystem());
+
+    long numLease = maxFilesLeasesCheckedForRelease + 10;
 
     //Make sure the leases we are going to add exceed the hard limit
     lm.setLeasePeriod(0, 0);
 
-    //Add some leases to the LeaseManager
-    lm.addLease("holder1", INodeId.ROOT_INODE_ID + 1);
-    lm.addLease("holder2", INodeId.ROOT_INODE_ID + 2);
-    lm.addLease("holder3", INodeId.ROOT_INODE_ID + 3);
-    assertEquals(lm.countLease(), 3);
+    for (long i = 0; i <= numLease - 1;i++) {
+      //Add some leases to the LeaseManager
+      lm.addLease("holder"+i, INodeId.ROOT_INODE_ID + i);
+    }
+    assertEquals(lm.countLease(), numLease);
 
     //Initiate a call to checkLease. This should exit within the test timeout
+    //and let some leases to remove for next call
     lm.checkLeases();
-  }
+    assertEquals(lm.countLease(), numLease - maxFilesLeasesCheckedForRelease);
 
+    //Check that reminder lease are well removed
+    lm.checkLeases();
+    assertEquals(lm.countLease(), 0);
+  }
 
   @Test
   public void testCountPath() {
@@ -112,6 +122,7 @@ public class TestLeaseManager {
     when(fsn.isRunning()).thenReturn(true);
     when(fsn.hasWriteLock()).thenReturn(true);
     when(fsn.getFSDirectory()).thenReturn(dir);
+    when(fsn.getMaxFilesLeasesCheckedForRelease()).thenReturn(maxFilesLeasesCheckedForRelease);
     return fsn;
   }
 

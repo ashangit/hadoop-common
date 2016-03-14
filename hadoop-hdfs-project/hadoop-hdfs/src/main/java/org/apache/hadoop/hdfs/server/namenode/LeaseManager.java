@@ -160,6 +160,12 @@ public class LeaseManager {
     return lease;
   }
 
+  private void removeFilesInLease(Lease leaseToCheck, List<Long> removing){
+    for(Long id : removing) {
+      removeLease(leaseToCheck, id);
+    }
+  }
+
   synchronized void removeLease(long inodeId) {
     final Lease lease = leasesById.get(inodeId);
     if (lease != null) {
@@ -356,7 +362,9 @@ public class LeaseManager {
     boolean needSync = false;
     assert fsnamesystem.hasWriteLock();
 
-    while(!sortedLeases.isEmpty() && sortedLeases.peek().expiredHardLimit()) {
+    int filesLeasesChecked = 0;
+    while(!sortedLeases.isEmpty() && sortedLeases.peek().expiredHardLimit()
+      && filesLeasesChecked < fsnamesystem.getMaxFilesLeasesCheckedForRelease()) {
       Lease leaseToCheck = sortedLeases.poll();
       LOG.info(leaseToCheck + " has expired hard limit");
 
@@ -396,12 +404,17 @@ public class LeaseManager {
           LOG.error("Cannot release the path " + p + " in the lease "
               + leaseToCheck, e);
           removing.add(id);
+        } finally {
+          filesLeasesChecked++;
+          if (filesLeasesChecked >= fsnamesystem.getMaxFilesLeasesCheckedForRelease()) {
+            LOG.warn("Breaking out of checkLeases() after " + filesLeasesChecked
+              + "  file leases checked.");
+            break;
+          }
         }
       }
 
-      for(Long id : removing) {
-        removeLease(leaseToCheck, id);
-      }
+      removeFilesInLease(leaseToCheck, removing);
     }
 
     return needSync;
