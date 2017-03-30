@@ -22,6 +22,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.server.namenode.ha.EditLogTailer;
+import org.apache.hadoop.hdfs.server.namenode.ha.StandbyCheckpointer;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.JvmPauseMonitor;
@@ -42,6 +44,8 @@ public class SyncNode {
     static{
         HdfsConfiguration.init();
     }
+
+    private EditLogTailerSyncNode editLogTailer = null;
 
     public static final Logger LOG =
             LoggerFactory.getLogger(SyncNode.class.getName());
@@ -94,6 +98,8 @@ public class SyncNode {
      * Start the services common to active and standby states
      */
     private void startCommonServices(Configuration conf) throws IOException {
+        editLogTailer = new EditLogTailerSyncNode(conf);
+        editLogTailer.start();
 //        namesystem.startCommonServices(conf, haContext);
 //        registerNNSMXBean();
 //        if (HdfsServerConstants.NamenodeRole.NAMENODE != role) {
