@@ -21,22 +21,13 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.hdfs.server.namenode.BackupNode;
-import org.apache.hadoop.hdfs.server.namenode.NNStorage;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
-import org.apache.hadoop.hdfs.server.namenode.ha.BootstrapStandby;
-import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgressMetrics;
+import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.tracing.TraceUtils;
-import org.apache.hadoop.tracing.TracerConfigurationManager;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,17 +46,13 @@ public class SyncNode {
 
     private static final String USAGE = "Usage: hdfs syncnode";
 
+    private JvmPauseMonitor pauseMonitor;
+    static NameNodeMetrics metrics;
+
     public SyncNode(Configuration conf) throws IOException {
         try {
-            initializeGenericKeys(conf, nsId, namenodeId);
             initialize(conf);
-            try {
-                haContext.writeLock();
-                state.prepareToEnterState(haContext);
-                state.enterState(haContext);
-            } finally {
-                haContext.writeUnlock();
-            }
+            // Start editlog tailer thread
         } catch (IOException e) {
             this.stop();
             throw e;
@@ -96,11 +83,98 @@ public class SyncNode {
 
         UserGroupInformation.setConfiguration(conf);
 
-        private JvmPauseMonitor pauseMonitor = new JvmPauseMonitor(conf);
+        pauseMonitor = new JvmPauseMonitor(conf);
         pauseMonitor.start();
         metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
 
         startCommonServices(conf);
+    }
+
+    /**
+     * Start the services common to active and standby states
+     */
+    private void startCommonServices(Configuration conf) throws IOException {
+//        namesystem.startCommonServices(conf, haContext);
+//        registerNNSMXBean();
+//        if (HdfsServerConstants.NamenodeRole.NAMENODE != role) {
+//            startHttpServer(conf);
+//            httpServer.setNameNodeAddress(getNameNodeAddress());
+//            httpServer.setFSImage(getFSImage());
+//        }
+//        rpcServer.start();
+//        plugins = conf.getInstances(DFS_NAMENODE_PLUGINS_KEY,
+//                ServicePlugin.class);
+//        for (ServicePlugin p: plugins) {
+//            try {
+//                p.start(this);
+//            } catch (Throwable t) {
+//                LOG.warn("ServicePlugin " + p + " could not be started", t);
+//            }
+//        }
+//        LOG.info(getRole() + " RPC up at: " + rpcServer.getRpcAddress());
+//        if (rpcServer.getServiceRpcAddress() != null) {
+//            LOG.info(getRole() + " service RPC up at: "
+//                    + rpcServer.getServiceRpcAddress());
+//        }
+    }
+
+    private void stopCommonServices() {
+//        if(rpcServer != null) rpcServer.stop();
+//        if(namesystem != null) namesystem.close();
+//        if (pauseMonitor != null) pauseMonitor.stop();
+//        if (plugins != null) {
+//            for (ServicePlugin p : plugins) {
+//                try {
+//                    p.stop();
+//                } catch (Throwable t) {
+//                    LOG.warn("ServicePlugin " + p + " could not be stopped", t);
+//                }
+//            }
+//        }
+//        stopHttpServer();
+    }
+
+    /**
+     * Wait for service to finish.
+     * (Normally, it runs forever.)
+     */
+    public void join() {
+//        try {
+//            rpcServer.join();
+//        } catch (InterruptedException ie) {
+//            LOG.info("Caught interrupted exception ", ie);
+//        }
+    }
+
+    /**
+     * Stop all NameNode threads and wait for all to finish.
+     */
+    public void stop() {
+//        synchronized(this) {
+//            if (stopRequested)
+//                return;
+//            stopRequested = true;
+//        }
+//        try {
+//            if (state != null) {
+//                state.exitState(haContext);
+//            }
+//        } catch (ServiceFailedException e) {
+//            LOG.warn("Encountered exception while exiting state ", e);
+//        } finally {
+//            stopCommonServices();
+//            if (metrics != null) {
+//                metrics.shutdown();
+//            }
+//            if (namesystem != null) {
+//                namesystem.shutdown();
+//            }
+//            if (nameNodeStatusBeanName != null) {
+//                MBeans.unregister(nameNodeStatusBeanName);
+//                nameNodeStatusBeanName = null;
+//            }
+//        }
+//        tracer.close();
     }
 
     /**
