@@ -45,7 +45,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.List;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REMOTE_SHARED_EDITS_DIR_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SYNCNODE_REMOTE_SHARED_EDITS_DIR_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
@@ -107,10 +107,6 @@ public class EditLogTailerSyncNode {
     List<URI> sharedEditsDirs = getRemoteSharedEditsDirs(conf);
 
     storage = new NNStorage(conf, Lists.<URI>newArrayList(), sharedEditsDirs);
-    if (conf.getBoolean(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_RESTORE_KEY,
-            DFSConfigKeys.DFS_NAMENODE_NAME_DIR_RESTORE_DEFAULT)) {
-      storage.setRestoreFailedStorage(true);
-    }
 
     this.editLog = new FSEditLog(conf, storage, sharedEditsDirs);
 
@@ -205,7 +201,7 @@ public class EditLogTailerSyncNode {
     // don't use getStorageDirs here, because we want an empty default
     // rather than the dir in /tmp
     Collection<String> dirNames = conf.getTrimmedStringCollection(
-            DFS_NAMENODE_REMOTE_SHARED_EDITS_DIR_KEY);
+            DFS_SYNCNODE_REMOTE_SHARED_EDITS_DIR_KEY);
     return Util.stringCollectionAsURIs(dirNames);
   }
 
@@ -296,12 +292,8 @@ public class EditLogTailerSyncNode {
     long editsLoaded = 0;
     try {
       //before: editsLoaded = image.loadEdits(streams, namesystem);
-      FSEditLogLoaderSyncNode loader = new FSEditLogLoaderSyncNode(lastTxnId);
+      FSEditLogLoaderSyncNode loader = new FSEditLogLoaderSyncNode(conf, lastTxnId);
       loadEdits(streams, loader);
-      for (EditLogInputStream logInput : streams) {
-        editsLoaded++;
-        LOG.info(logInput.readOp());
-      }
     } finally {
       if (editsLoaded > 0 || LOG.isDebugEnabled()) {
         LOG.info(String.format("Loaded %d edits starting from txid %d ",
