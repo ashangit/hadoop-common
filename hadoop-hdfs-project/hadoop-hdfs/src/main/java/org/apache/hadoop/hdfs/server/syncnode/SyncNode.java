@@ -22,8 +22,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
-import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.JvmPauseMonitor;
@@ -41,13 +39,16 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 @InterfaceAudience.Private
 public class SyncNode {
 
+    static{
+        HdfsConfiguration.init();
+    }
+
     public static final Logger LOG =
-            LoggerFactory.getLogger(NameNode.class.getName());
+            LoggerFactory.getLogger(SyncNode.class.getName());
 
     private static final String USAGE = "Usage: hdfs syncnode";
 
     private JvmPauseMonitor pauseMonitor;
-    static NameNodeMetrics metrics;
 
     public SyncNode(Configuration conf) throws IOException {
         try {
@@ -85,7 +86,6 @@ public class SyncNode {
 
         pauseMonitor = new JvmPauseMonitor(conf);
         pauseMonitor.start();
-        metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
 
         startCommonServices(conf);
     }
