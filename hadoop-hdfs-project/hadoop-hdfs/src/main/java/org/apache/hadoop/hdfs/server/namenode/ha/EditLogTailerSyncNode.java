@@ -58,8 +58,7 @@ public class EditLogTailerSyncNode {
   private final EditLogTailerThread tailerThread;
 
   private final Configuration conf;
-  private final FSNamesystem namesystem;
-  private FSEditLog editLog;
+  //private FSEditLog editLog;
 
   private InetSocketAddress activeAddr;
   private NamenodeProtocol cachedActiveProxy = null;
@@ -96,8 +95,8 @@ public class EditLogTailerSyncNode {
   public EditLogTailerSyncNode(Configuration conf) {
     this.tailerThread = new EditLogTailerThread();
     this.conf = conf;
-    this.namesystem = namesystem;
-    this.editLog = namesystem.getEditLog();
+    // Get edit log from somewhere
+    // this.editLog = namesystem.getEditLog();
     
     lastLoadTimeMs = monotonicNow();
 
@@ -156,16 +155,6 @@ public class EditLogTailerSyncNode {
     }
   }
   
-  @VisibleForTesting
-  FSEditLog getEditLog() {
-    return editLog;
-  }
-  
-  @VisibleForTesting
-  public void setEditLog(FSEditLog editLog) {
-    this.editLog = editLog;
-  }
-  
   public void catchupDuringFailover() throws IOException {
     Preconditions.checkState(tailerThread == null ||
         !tailerThread.isAlive(),
@@ -194,9 +183,8 @@ public class EditLogTailerSyncNode {
     // transitionToActive RPC takes the write lock before calling
     // tailer.stop() -- so if we're not interruptible, it will
     // deadlock.
-    namesystem.writeLockInterruptibly();
     try {
-      FSImage image = namesystem.getFSImage();
+      //FSImage image = namesystem.getFSImage();
 
       long lastTxnId = image.getLastAppliedTxId();
       
@@ -239,15 +227,7 @@ public class EditLogTailerSyncNode {
       }
       lastLoadedTxnId = image.getLastAppliedTxId();
     } finally {
-      namesystem.writeUnlock();
     }
-  }
-
-  /**
-   * @return time in msec of when we last loaded a non-zero number of edits.
-   */
-  public long getLastLoadTimeMs() {
-    return lastLoadTimeMs;
   }
 
   /**
@@ -317,20 +297,6 @@ public class EditLogTailerSyncNode {
           if (!shouldRun) {
             break;
           }
-          // Prevent reading of name system while being modified. The full
-          // name system lock will be acquired to further block even the block
-          // state updates.
-          namesystem.cpLockInterruptibly();
-          try {
-            doTailEdits();
-          } finally {
-            namesystem.cpUnlock();
-          }
-        } catch (EditLogInputException elie) {
-          LOG.warn("Error while reading edits from disk. Will try again.", elie);
-        } catch (InterruptedException ie) {
-          // interrupter should have already set shouldRun to false
-          continue;
         } catch (Throwable t) {
           LOG.fatal("Unknown error encountered while tailing edits. " +
               "Shutting down standby NN.", t);
