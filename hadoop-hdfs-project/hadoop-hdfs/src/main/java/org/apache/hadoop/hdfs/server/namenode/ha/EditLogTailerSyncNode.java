@@ -35,7 +35,7 @@ import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.SecurityUtil;
 
-import java.io.IOException;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
@@ -97,43 +97,43 @@ public class EditLogTailerSyncNode {
     this.conf = conf;
     // Get edit log from somewhere
     // this.editLog = namesystem.getEditLog();
-    
+
     lastLoadTimeMs = monotonicNow();
 
     logRollPeriodMs = conf.getInt(DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY,
-        DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_DEFAULT) * 1000;
+            DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_DEFAULT) * 1000;
     if (logRollPeriodMs >= 0) {
       this.activeAddr = getActiveNodeAddress();
       Preconditions.checkArgument(activeAddr.getPort() > 0,
-          "Active NameNode must have an IPC port configured. " +
-          "Got address '%s'", activeAddr);
+              "Active NameNode must have an IPC port configured. " +
+                      "Got address '%s'", activeAddr);
       LOG.info("Will roll logs on active node at " + activeAddr + " every " +
-          (logRollPeriodMs / 1000) + " seconds.");
+              (logRollPeriodMs / 1000) + " seconds.");
     } else {
       LOG.info("Not going to trigger log rolls on active node because " +
-          DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY + " is negative.");
+              DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY + " is negative.");
     }
-    
+
     sleepTimeMs = conf.getInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY,
-        DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_DEFAULT) * 1000;
-    
+            DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_DEFAULT) * 1000;
+
     LOG.debug("logRollPeriodMs=" + logRollPeriodMs +
-        " sleepTime=" + sleepTimeMs);
+            " sleepTime=" + sleepTimeMs);
   }
-  
+
   private InetSocketAddress getActiveNodeAddress() {
     Configuration activeConf = HAUtil.getConfForOtherNode(conf);
     return NameNode.getServiceAddress(activeConf, true);
   }
-  
+
   private NamenodeProtocol getActiveNodeProxy() throws IOException {
     if (cachedActiveProxy == null) {
       int rpcTimeout = conf.getInt(
-          DFSConfigKeys.DFS_HA_LOGROLL_RPC_TIMEOUT_KEY,
-          DFSConfigKeys.DFS_HA_LOGROLL_RPC_TIMEOUT_DEFAULT);
+              DFSConfigKeys.DFS_HA_LOGROLL_RPC_TIMEOUT_KEY,
+              DFSConfigKeys.DFS_HA_LOGROLL_RPC_TIMEOUT_DEFAULT);
       NamenodeProtocolPB proxy = RPC.waitForProxy(NamenodeProtocolPB.class,
-          RPC.getProtocolVersion(NamenodeProtocolPB.class), activeAddr, conf,
-          rpcTimeout, Long.MAX_VALUE);
+              RPC.getProtocolVersion(NamenodeProtocolPB.class), activeAddr, conf,
+              rpcTimeout, Long.MAX_VALUE);
       cachedActiveProxy = new NamenodeProtocolTranslatorPB(proxy);
     }
     assert cachedActiveProxy != null;
@@ -143,7 +143,7 @@ public class EditLogTailerSyncNode {
   public void start() {
     tailerThread.start();
   }
-  
+
   public void stop() throws IOException {
     tailerThread.setShouldRun(false);
     tailerThread.interrupt();
@@ -154,11 +154,11 @@ public class EditLogTailerSyncNode {
       throw new IOException(e);
     }
   }
-  
+
   public void catchupDuringFailover() throws IOException {
     Preconditions.checkState(tailerThread == null ||
-        !tailerThread.isAlive(),
-        "Tailer thread should not be running once failover starts");
+                    !tailerThread.isAlive(),
+            "Tailer thread should not be running once failover starts");
     // Important to do tailing as the login user, in case the shared
     // edits storage is implemented by a JournalManager that depends
     // on security credentials to access the logs (eg QuorumJournalManager).
@@ -176,18 +176,43 @@ public class EditLogTailerSyncNode {
       }
     });
   }
-  
+
   @VisibleForTesting
   void doTailEdits() throws IOException, InterruptedException {
     // Write lock needs to be interruptible here because the 
     // transitionToActive RPC takes the write lock before calling
     // tailer.stop() -- so if we're not interruptible, it will
     // deadlock.
+    long lastTxnId = 0;
     try {
       //FSImage image = namesystem.getFSImage();
 
-      long lastTxnId = image.getLastAppliedTxId();
-      
+      File lastEditFile = new File("/tmp/syncnode/lastTxnId");
+      FileInputStream fis = null;
+      BufferedInputStream bis = null;
+      DataInputStream dis = null;
+
+      try {
+        fis = new FileInputStream(lastEditFile);
+
+        bis = new BufferedInputStream(fis);
+        InputStreamReader isr = new InputStreamReader(fis);
+        BufferedReader br = new BufferedReader(isr);
+
+        lastTxnId = Long.parseLong(br.readLine());
+
+      } catch (IOException e) {
+        e.printStackTrace();
+      } finally {
+        try {
+          fis.close();
+          bis.close();
+          dis.close();
+        } catch (IOException ex) {
+          ex.printStackTrace();
+        }
+      }
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("lastTxnId: " + lastTxnId);
       }
@@ -199,13 +224,13 @@ public class EditLogTailerSyncNode {
         // log roll, i.e. the last one has been finalized but the new inprogress
         // edits file hasn't been started yet.
         LOG.warn("Edits tailer failed to find any streams. Will try again " +
-            "later.", ioe);
+                "later.", ioe);
         return;
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("edit streams to load from: " + streams.size());
       }
-      
+
       // Once we have streams to load, errors encountered are legitimate cause
       // for concern, so we don't catch them here. Simple errors reading from
       // disk are ignored.
@@ -218,7 +243,7 @@ public class EditLogTailerSyncNode {
       } finally {
         if (editsLoaded > 0 || LOG.isDebugEnabled()) {
           LOG.info(String.format("Loaded %d edits starting from txid %d ",
-              editsLoaded, lastTxnId));
+                  editsLoaded, lastTxnId));
         }
       }
 
@@ -234,8 +259,8 @@ public class EditLogTailerSyncNode {
    * @return true if the configured log roll period has elapsed.
    */
   private boolean tooLongSinceLastLoad() {
-    return logRollPeriodMs >= 0 && 
-      (monotonicNow() - lastLoadTimeMs) > logRollPeriodMs ;
+    return logRollPeriodMs >= 0 &&
+            (monotonicNow() - lastLoadTimeMs) > logRollPeriodMs ;
   }
 
   /**
@@ -257,27 +282,27 @@ public class EditLogTailerSyncNode {
    */
   private class EditLogTailerThread extends Thread {
     private volatile boolean shouldRun = true;
-    
+
     private EditLogTailerThread() {
       super("Edit log tailer");
     }
-    
+
     private void setShouldRun(boolean shouldRun) {
       this.shouldRun = shouldRun;
     }
-    
+
     @Override
     public void run() {
       SecurityUtil.doAsLoginUserOrFatal(
-          new PrivilegedAction<Object>() {
-          @Override
-          public Object run() {
-            doWork();
-            return null;
-          }
-        });
+              new PrivilegedAction<Object>() {
+                @Override
+                public Object run() {
+                  doWork();
+                  return null;
+                }
+              });
     }
-    
+
     private void doWork() {
       while (shouldRun) {
         try {
@@ -285,7 +310,7 @@ public class EditLogTailerSyncNode {
           // read any more transactions since the last time a roll was
           // triggered. 
           if (tooLongSinceLastLoad() &&
-              lastRollTriggerTxId < lastLoadedTxnId) {
+                  lastRollTriggerTxId < lastLoadedTxnId) {
             triggerActiveLogRoll();
           }
           /**
@@ -299,7 +324,7 @@ public class EditLogTailerSyncNode {
           }
         } catch (Throwable t) {
           LOG.fatal("Unknown error encountered while tailing edits. " +
-              "Shutting down standby NN.", t);
+                  "Shutting down standby NN.", t);
           terminate(1, t);
         }
 
