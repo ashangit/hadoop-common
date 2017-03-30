@@ -44,6 +44,8 @@ public class SyncNode {
         HdfsConfiguration.init();
     }
 
+    volatile private boolean running = true;
+
     private EditLogTailerSyncNode editLogTailer = null;
 
     public static final Logger LOG =
@@ -143,7 +145,10 @@ public class SyncNode {
      * Wait for service to finish.
      * (Normally, it runs forever.)
      */
-    public void join() {
+    public void join() throws InterruptedException {
+        while (running) {
+            wait();
+        }
 //        try {
 //            rpcServer.join();
 //        } catch (InterruptedException ie) {
@@ -155,6 +160,7 @@ public class SyncNode {
      * Stop all NameNode threads and wait for all to finish.
      */
     public void stop() {
+        running = false;
 //        synchronized(this) {
 //            if (stopRequested)
 //                return;
