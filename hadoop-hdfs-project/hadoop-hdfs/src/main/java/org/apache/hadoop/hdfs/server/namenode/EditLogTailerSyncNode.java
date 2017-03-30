@@ -240,11 +240,12 @@ public class EditLogTailerSyncNode {
     return lastTxnId;
   }
 
-  long loadEdits(Iterable<EditLogInputStream> editStreams, FSEditLogLoaderSyncNode loader) {
+  long loadEdits(Iterable<EditLogInputStream> editStreams, FSEditLogLoaderSyncNode loader) throws IOException {
+    long lastAppliedTxId=lastTxnId;
     try{
       for (EditLogInputStream editIn : editStreams) {
         try {
-          loader.loadFSEdits(editIn, lastTxnId + 1, startOpt, recovery);
+          loader.loadFSEdits(editIn, lastTxnId + 1, null, null);
         } finally {
           // Update lastAppliedTxId even in case of error, since some ops may
           // have been successfully applied before the error.
@@ -260,8 +261,7 @@ public class EditLogTailerSyncNode {
       // update the counts
       //before: updateCountForQuota(target.dir.rootDir, quotaInitThreads);
     }
-    prog.endPhase(Phase.LOADING_EDITS);
-    return lastAppliedTxId - prevLastAppliedTxId;
+    return lastAppliedTxId - lastTxnId;
   }
 
   @VisibleForTesting
