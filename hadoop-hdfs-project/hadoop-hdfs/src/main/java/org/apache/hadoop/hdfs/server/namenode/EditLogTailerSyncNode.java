@@ -192,41 +192,46 @@ public class EditLogTailerSyncNode {
     });
   }
 
+  long getLastTxFromFile(){
+    File lastEditFile = new File("/tmp/syncnode/lastTxnId");
+    FileInputStream fis = null;
+    BufferedInputStream bis = null;
+    DataInputStream dis = null;
+
+    long lastTxnId = 0;
+
+    try {
+      fis = new FileInputStream(lastEditFile);
+
+      bis = new BufferedInputStream(fis);
+      InputStreamReader isr = new InputStreamReader(fis);
+      BufferedReader br = new BufferedReader(isr);
+
+      lastTxnId = Long.parseLong(br.readLine());
+
+    } catch (IOException e) {
+      e.printStackTrace();
+    } finally {
+      try {
+        fis.close();
+        bis.close();
+        dis.close();
+      } catch (IOException ex) {
+        ex.printStackTrace();
+      }
+    }
+    return lastTxnId;
+  }
+
   @VisibleForTesting
   void doTailEdits() throws IOException, InterruptedException {
     // Write lock needs to be interruptible here because the 
     // transitionToActive RPC takes the write lock before calling
     // tailer.stop() -- so if we're not interruptible, it will
     // deadlock.
-    long lastTxnId = 0;
     try {
       //FSImage image = namesystem.getFSImage();
-
-      File lastEditFile = new File("/tmp/syncnode/lastTxnId");
-      FileInputStream fis = null;
-      BufferedInputStream bis = null;
-      DataInputStream dis = null;
-
-      try {
-        fis = new FileInputStream(lastEditFile);
-
-        bis = new BufferedInputStream(fis);
-        InputStreamReader isr = new InputStreamReader(fis);
-        BufferedReader br = new BufferedReader(isr);
-
-        lastTxnId = Long.parseLong(br.readLine());
-
-      } catch (IOException e) {
-        e.printStackTrace();
-      } finally {
-        try {
-          fis.close();
-          bis.close();
-          dis.close();
-        } catch (IOException ex) {
-          ex.printStackTrace();
-        }
-      }
+      long lastTxnId = getLastTxFromFile();
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("lastTxnId: " + lastTxnId);
