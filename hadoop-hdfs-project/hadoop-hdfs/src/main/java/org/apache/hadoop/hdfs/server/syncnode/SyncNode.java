@@ -58,7 +58,6 @@ public class SyncNode {
     public SyncNode(Configuration conf) throws IOException {
         try {
             initialize(conf);
-            // Start editlog tailer thread
         } catch (IOException e) {
             this.stop();
             throw e;
