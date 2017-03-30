@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdfs.server.namenode.ha;
+package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -30,16 +31,17 @@ import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolTranslatorPB;
-import org.apache.hadoop.hdfs.server.namenode.*;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.SecurityUtil;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
+import java.util.List;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -58,10 +60,12 @@ public class EditLogTailerSyncNode {
   private final EditLogTailerThread tailerThread;
 
   private final Configuration conf;
-  //private FSEditLog editLog;
+  private FSEditLog editLog;
 
   private InetSocketAddress activeAddr;
   private NamenodeProtocol cachedActiveProxy = null;
+
+  protected NNStorage storage;
 
   /**
    * The last transaction ID at which an edit log roll was initiated.
@@ -92,9 +96,20 @@ public class EditLogTailerSyncNode {
    */
   private final long sleepTimeMs;
 
-  public EditLogTailerSyncNode(Configuration conf) {
+  public EditLogTailerSyncNode(Configuration conf) throws IOException {
     this.tailerThread = new EditLogTailerThread();
     this.conf = conf;
+
+    List<URI> sharedEditsDirs = FSNamesystem.getSharedEditsDirs(conf);
+
+    storage = new NNStorage(conf, Lists.<URI>newArrayList(), sharedEditsDirs);
+    if(conf.getBoolean(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_RESTORE_KEY,
+            DFSConfigKeys.DFS_NAMENODE_NAME_DIR_RESTORE_DEFAULT)) {
+      storage.setRestoreFailedStorage(true);
+    }
+
+    this.editLog = new FSEditLog(conf, storage, sharedEditsDirs);
+
     // Get edit log from somewhere
     // this.editLog = namesystem.getEditLog();
 
