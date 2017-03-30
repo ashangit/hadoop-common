@@ -1522,8 +1522,8 @@ public class FSEditLog implements LogsPurgeable {
    * overlap.  This could be done better and with more generality with an
    * interval tree.
    */
-  private void checkForGaps(List<EditLogInputStream> streams, long fromTxId,
-      long toAtLeastTxId, boolean inProgressOk) throws IOException {
+  void checkForGaps(List<EditLogInputStream> streams, long fromTxId,
+                    long toAtLeastTxId, boolean inProgressOk) throws IOException {
     Iterator<EditLogInputStream> iter = streams.iterator();
     long txId = fromTxId;
     while (true) {

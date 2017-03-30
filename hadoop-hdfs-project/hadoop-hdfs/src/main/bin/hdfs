@@ -177,7 +177,7 @@ elif [ "$COMMAND" = "datanode" ] ; then
     HADOOP_OPTS="$HADOOP_OPTS -server $HADOOP_DATANODE_OPTS"
   fi
 elif [ "$COMMAND" = "syncnode" ] ; then
-  CLASS='org.apache.hadoop.hdfs.qjournal.server.SyncNode'
+  CLASS='org.apache.hadoop.hdfs.server.syncnode.SyncNode'
   HADOOP_OPTS="$HADOOP_OPTS $HADOOP_SYNCNODE_OPTS"
 elif [ "$COMMAND" = "journalnode" ] ; then
   CLASS='org.apache.hadoop.hdfs.qjournal.server.JournalNode'

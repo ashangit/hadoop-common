@@ -40,7 +40,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 @InterfaceAudience.Private
 public class SyncNode {
 
-    static{
+    static {
         HdfsConfiguration.init();
     }
 
@@ -73,7 +73,7 @@ public class SyncNode {
         if (conf == null)
             conf = new HdfsConfiguration();
 
-        DefaultMetricsSystem.initialize("NameNode");
+        DefaultMetricsSystem.initialize("SyncNode");
         return new SyncNode(conf);
     }
 
@@ -100,44 +100,10 @@ public class SyncNode {
     private void startCommonServices(Configuration conf) throws IOException {
         editLogTailer = new EditLogTailerSyncNode(conf);
         editLogTailer.start();
-//        namesystem.startCommonServices(conf, haContext);
-//        registerNNSMXBean();
-//        if (HdfsServerConstants.NamenodeRole.NAMENODE != role) {
-//            startHttpServer(conf);
-//            httpServer.setNameNodeAddress(getNameNodeAddress());
-//            httpServer.setFSImage(getFSImage());
-//        }
-//        rpcServer.start();
-//        plugins = conf.getInstances(DFS_NAMENODE_PLUGINS_KEY,
-//                ServicePlugin.class);
-//        for (ServicePlugin p: plugins) {
-//            try {
-//                p.start(this);
-//            } catch (Throwable t) {
-//                LOG.warn("ServicePlugin " + p + " could not be started", t);
-//            }
-//        }
-//        LOG.info(getRole() + " RPC up at: " + rpcServer.getRpcAddress());
-//        if (rpcServer.getServiceRpcAddress() != null) {
-//            LOG.info(getRole() + " service RPC up at: "
-//                    + rpcServer.getServiceRpcAddress());
-//        }
     }
 
-    private void stopCommonServices() {
-//        if(rpcServer != null) rpcServer.stop();
-//        if(namesystem != null) namesystem.close();
-//        if (pauseMonitor != null) pauseMonitor.stop();
-//        if (plugins != null) {
-//            for (ServicePlugin p : plugins) {
-//                try {
-//                    p.stop();
-//                } catch (Throwable t) {
-//                    LOG.warn("ServicePlugin " + p + " could not be stopped", t);
-//                }
-//            }
-//        }
-//        stopHttpServer();
+    private void stopCommonServices() throws IOException {
+        editLogTailer.stop();
     }
 
     /**
@@ -146,45 +112,18 @@ public class SyncNode {
      */
     public void join() throws InterruptedException {
         while (running) {
-            wait();
+            synchronized (this) {
+                wait(2000);
+            }
         }
-//        try {
-//            rpcServer.join();
-//        } catch (InterruptedException ie) {
-//            LOG.info("Caught interrupted exception ", ie);
-//        }
     }
 
     /**
      * Stop all NameNode threads and wait for all to finish.
      */
-    public void stop() {
+    public void stop() throws IOException {
         running = false;
-//        synchronized(this) {
-//            if (stopRequested)
-//                return;
-//            stopRequested = true;
-//        }
-//        try {
-//            if (state != null) {
-//                state.exitState(haContext);
-//            }
-//        } catch (ServiceFailedException e) {
-//            LOG.warn("Encountered exception while exiting state ", e);
-//        } finally {
-//            stopCommonServices();
-//            if (metrics != null) {
-//                metrics.shutdown();
-//            }
-//            if (namesystem != null) {
-//                namesystem.shutdown();
-//            }
-//            if (nameNodeStatusBeanName != null) {
-//                MBeans.unregister(nameNodeStatusBeanName);
-//                nameNodeStatusBeanName = null;
-//            }
-//        }
-//        tracer.close();
+        stopCommonServices();
     }
 
     /**

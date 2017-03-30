@@ -18,41 +18,24 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.protocol.*;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.RollingUpgradeStartupOption;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.Storage;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.*;
-import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
-import org.apache.hadoop.hdfs.server.namenode.LeaseManager.Lease;
-import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeFile;
-import org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot;
-import org.apache.hadoop.hdfs.server.namenode.startupprogress.Phase;
-import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddCloseOp;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress.Counter;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Step;
 import org.apache.hadoop.hdfs.util.Holder;
-import org.apache.hadoop.util.ChunkedArrayList;
 
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.List;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSImageFormat.renameReservedPathsOnUpgrade;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -78,47 +61,48 @@ public class FSEditLogLoaderSyncNode {
                 DFSConfigKeys.DFS_SYNCNODE_REPLICATION_DEFAULT);
     }
 
-    long loadFSEdits(EditLogInputStream edits, long expectedStartingTxId)
-            throws IOException {
-        return loadFSEdits(edits, expectedStartingTxId, null, null);
-    }
-
     /**
      * Load an edit log, and apply the changes to the in-memory structure
      * This is where we apply edits that we've been writing to disk all
      * along.
      */
-    long loadFSEdits(EditLogInputStream edits, long expectedStartingTxId,
-                     StartupOption startOpt, MetaRecoveryContext recovery) throws IOException {
-        //StartupProgress prog = NameNode.getStartupProgress();
-        //Step step = createStartupProgressStep(edits);
-        //prog.beginStep(Phase.LOADING_EDITS, step);
+    long loadFSEdits(EditLogInputStream edits) throws IOException {
         try {
             long startTime = monotonicNow();
             FSImage.LOG.info("Start loading edits file " + edits.getName());
-            long numEdits = loadEditRecords(edits, false, expectedStartingTxId,
-                    startOpt, recovery);
+            long numEdits = loadEditRecords(edits);
             FSImage.LOG.info("Edits file " + edits.getName()
                     + " of size " + edits.length() + " edits # " + numEdits
                     + " loaded in " + (monotonicNow() - startTime) / 1000 + " seconds");
             return numEdits;
         } finally {
             edits.close();
-            //prog.endStep(Phase.LOADING_EDITS, step);
         }
     }
 
-    //BISOUUUUUUUUUUUUUUUUUUUUUUU
-    long loadEditRecords(EditLogInputStream in, boolean closeOnExit,
-                         long expectedStartingTxId, StartupOption startOpt,
-                         MetaRecoveryContext recovery) throws IOException {
+    long loadEditRecords(EditLogInputStream in) throws IOException {
         long numEdits = 0;
-        while (true) {
-            FSEditLogOp op;
-            op = in.readOp();
-            long inodeId = applyEditLogOp(op, in.getVersion(true));
-            numEdits++;
+        try {
+            while (true) {
+                FSEditLogOp op;
+                try {
+                    op = in.readOp();
+                    if (op == null) {
+                        break;
+                    }
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                    continue;
+                }
+                applyEditLogOp(op, in.getVersion(true));
+                numEdits++;
+            }
+        } finally {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("replaying edit log finished");
+            }
         }
+        return numEdits;
     }
 
     private long applyEditLogOp(FSEditLogOp op, int logVersion) throws IOException {
@@ -404,7 +388,8 @@ public class FSEditLogLoaderSyncNode {
 //        break;
 //      }
             default:
-                throw new IOException("Invalid operation read " + op.opCode);
+                LOG.error("Invalid operation read " + op.opCode);
+                break;
         }
         //return inodeId;
         return 0L;
