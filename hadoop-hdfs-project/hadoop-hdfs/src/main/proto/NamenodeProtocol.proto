@@ -284,5 +284,5 @@ service NamenodeProtocolService {
    * Return for each block the list of datanode hosting it
    */
   rpc getDatanodesForBlocks(GetDatanodesForBlocksRequestProto)
-      returns (GetDatanodesForBlocksResponseProto)
+      returns (GetDatanodesForBlocksResponseProto);
 }
