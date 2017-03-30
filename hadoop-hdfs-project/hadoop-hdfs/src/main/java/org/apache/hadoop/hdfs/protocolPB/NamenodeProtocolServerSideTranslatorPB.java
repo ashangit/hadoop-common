@@ -239,4 +239,9 @@ public class NamenodeProtocolServerSideTranslatorPB implements
     return IsUpgradeFinalizedResponseProto.newBuilder()
         .setIsUpgradeFinalized(isUpgradeFinalized).build();
   }
+
+  @Override
+  public NamenodeProtocolProtos.GetDatanodesForBlocksResponseProto getDatanodesForBlocks(RpcController controller, NamenodeProtocolProtos.GetDatanodesForBlocksRequestProto request) throws ServiceException {
+    return null;
+  }
 }
