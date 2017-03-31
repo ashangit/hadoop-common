@@ -75,6 +75,8 @@ public class EditLogTailerSyncNode {
      */
     private final long logRollPeriodMs;
 
+    private final String syncnodeFolder;
+
     /**
      * How often the Standby should check if there are new finalized segment(s)
      * available to be read from.
@@ -101,6 +103,9 @@ public class EditLogTailerSyncNode {
         sleepTimeMs = conf.getInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY,
                 DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_DEFAULT) * 1000;
 
+        syncnodeFolder = conf.getTrimmed(DFSConfigKeys.DFS_SYNCNODE_EDITS_DIR_KEY,
+                DFSConfigKeys.DFS_SYNCNODE_EDITS_DIR_DEFAULT);
+
         LOG.debug("logRollPeriodMs=" + logRollPeriodMs +
                 " sleepTime=" + sleepTimeMs);
     }
@@ -120,7 +125,7 @@ public class EditLogTailerSyncNode {
     }
 
     long getLastTxFromFile() {
-        String lastEditFile = "/tmp/syncnode/lastTxnId";
+        String lastEditFile = syncnodeFolder + "/lastTxnId";
         FileInputStream fis = null;
         BufferedInputStream bis = null;
         DataInputStream dis = null;

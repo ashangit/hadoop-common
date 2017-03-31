@@ -803,6 +803,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
     false;
 
   // syncnode Configurations
-  public static final int  DFS_SYNCNODE_REPLICATION_DEFAULT = 3;
   public static final String  DFS_SYNCNODE_REPLICATION_KEY = "dfs.syncnode.replication";
+  public static final int  DFS_SYNCNODE_REPLICATION_DEFAULT = 3;
+  public static final String  DFS_SYNCNODE_EDITS_DIR_KEY = "dfs.syncnode.edits.dir";
+  public static final String  DFS_SYNCNODE_EDITS_DIR_DEFAULT = "/tmp/hadoop/dfs/syncnode/";
 }
