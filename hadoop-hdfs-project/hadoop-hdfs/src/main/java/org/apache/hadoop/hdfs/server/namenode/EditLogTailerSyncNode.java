@@ -27,17 +27,18 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.security.SecurityUtil;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.PrivilegedAction;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -75,7 +76,7 @@ public class EditLogTailerSyncNode {
      */
     private final long logRollPeriodMs;
 
-    private final String syncnodeFolder;
+    private final File syncnodeFolder;
 
     /**
      * How often the Standby should check if there are new finalized segment(s)
@@ -84,7 +85,7 @@ public class EditLogTailerSyncNode {
     private final long sleepTimeMs;
     private long lastTxnId;
 
-    public EditLogTailerSyncNode(Configuration conf) throws IOException {
+    public EditLogTailerSyncNode(Configuration conf, StorageDirectory sd) throws IOException {
         this.tailerThread = new EditLogTailerSyncNodeThread();
         this.conf = conf;
 
@@ -103,8 +104,7 @@ public class EditLogTailerSyncNode {
         sleepTimeMs = conf.getInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY,
                 DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_DEFAULT) * 1000;
 
-        syncnodeFolder = conf.getTrimmed(DFSConfigKeys.DFS_SYNCNODE_EDITS_DIR_KEY,
-                DFSConfigKeys.DFS_SYNCNODE_EDITS_DIR_DEFAULT);
+        syncnodeFolder = sd.getCurrentDir();
 
         LOG.debug("logRollPeriodMs=" + logRollPeriodMs +
                 " sleepTime=" + sleepTimeMs);
@@ -125,16 +125,10 @@ public class EditLogTailerSyncNode {
     }
 
     long getLastTxFromFile() {
-        String lastEditFile = syncnodeFolder + "/lastTxnId";
-        FileInputStream fis = null;
-        BufferedInputStream bis = null;
-        DataInputStream dis = null;
-
         long lastTxnId = 0;
 
-
         try {
-            Path path = Paths.get(lastEditFile);
+            Path path = Paths.get(new File(syncnodeFolder, "lastTxnId").getAbsolutePath());
             if (path.toFile().isFile()) {
                 List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
 
@@ -171,30 +165,6 @@ public class EditLogTailerSyncNode {
             //before: updateCountForQuota(target.dir.rootDir, quotaInitThreads);
         }
         return lastAppliedTxId - lastTxnId;
-    }
-
-    public Collection<EditLogInputStream> selectInputStreams(
-            long fromTxId, long toAtLeastTxId, MetaRecoveryContext recovery,
-            boolean inProgressOk) throws IOException {
-
-        List<EditLogInputStream> streams = new ArrayList<EditLogInputStream>();
-        synchronized (journalSetLock) {
-            editLog.selectInputStreams(streams, fromTxId, inProgressOk);
-        }
-
-        try {
-            editLog.checkForGaps(streams, fromTxId, toAtLeastTxId, inProgressOk);
-        } catch (IOException e) {
-            if (recovery != null) {
-                // If recovery mode is enabled, continue loading even if we know we
-                // can't load up to toAtLeastTxId.
-                LOG.error(e);
-            } else {
-                editLog.closeAllStreams(streams);
-                throw e;
-            }
-        }
-        return streams;
     }
 
     @VisibleForTesting

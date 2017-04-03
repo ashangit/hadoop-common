@@ -44,7 +44,8 @@ public final class HdfsServerConstants {
   static public enum NodeType {
     NAME_NODE,
     DATA_NODE,
-    JOURNAL_NODE;
+    JOURNAL_NODE,
+    SYNC_NODE;
   }
 
   /** Startup options for rolling upgrade. */

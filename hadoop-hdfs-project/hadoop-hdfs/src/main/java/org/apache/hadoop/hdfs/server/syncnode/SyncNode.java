@@ -20,18 +20,27 @@ package org.apache.hadoop.hdfs.server.syncnode;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.protocolPB.SyncNodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.namenode.EditLogTailerSyncNode;
+import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.Map;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_USER_GROUP_METRICS_PERCENTILES_INTERVALS;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY;
@@ -54,6 +63,10 @@ public class SyncNode {
     private static final String USAGE = "Usage: hdfs syncnode";
 
     private JvmPauseMonitor pauseMonitor;
+
+    private SNStorage storage = null;
+
+    private StorageDirectory sd = null;
 
     public SyncNode(Configuration conf) throws IOException {
         try {
@@ -78,6 +91,36 @@ public class SyncNode {
     }
 
     protected void initialize(Configuration conf) throws IOException {
+        File syncnodeFolder = new File(conf.getTrimmed(DFSConfigKeys.DFS_SYNCNODE_DIR_KEY,
+                DFSConfigKeys.DFS_SYNCNODE_DIR_DEFAULT));
+
+        validateAndCreateSyncDir(syncnodeFolder);
+
+        storage = new SNStorage();
+
+        Map<String, Map<String, InetSocketAddress>> newAddressMap = DFSUtil
+                .getNNServiceRpcAddressesForCluster(conf);
+
+        NamespaceInfo nsInfo = null;
+        for (Map<String, InetSocketAddress> valueMap : newAddressMap.values()) {
+            for (InetSocketAddress value : valueMap.values()) {
+                try {
+                    LOG.info(value.getHostName());
+                    SyncNodeProtocolClientSideTranslatorPB syncPB = new SyncNodeProtocolClientSideTranslatorPB(value, conf);
+                    nsInfo = syncPB.versionRequest();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    continue;
+                } finally {
+                    break;
+                }
+            }
+        }
+
+        LOG.info(nsInfo.getClusterID());
+
+        sd = storage.loadStorageDirectory(nsInfo, syncnodeFolder, HdfsServerConstants.StartupOption.REGULAR);
+
         if (conf.get(HADOOP_USER_GROUP_METRICS_PERCENTILES_INTERVALS) == null) {
             String intervals = conf.get(DFS_METRICS_PERCENTILES_INTERVALS_KEY);
             if (intervals != null) {
@@ -98,12 +141,21 @@ public class SyncNode {
      * Start the services common to active and standby states
      */
     private void startCommonServices(Configuration conf) throws IOException {
-        editLogTailer = new EditLogTailerSyncNode(conf);
+        editLogTailer = new EditLogTailerSyncNode(conf, sd);
         editLogTailer.start();
     }
 
     private void stopCommonServices() throws IOException {
         editLogTailer.stop();
+    }
+
+    private static void validateAndCreateSyncDir(File dir) throws IOException {
+        if (!dir.isAbsolute()) {
+            throw new IllegalArgumentException(
+                    "Sync dir '" + dir + "' should be an absolute path");
+        }
+
+        DiskChecker.checkDir(dir);
     }
 
     /**

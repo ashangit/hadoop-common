@@ -104,12 +104,8 @@ import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ClientNamenodeProtocol;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeProtocolService;
 import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.NamenodeProtocolService;
-import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolPB;
-import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolServerSideTranslatorPB;
-import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolPB;
-import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolServerSideTranslatorPB;
-import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolPB;
-import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdfs.protocol.proto.SyncNodeProtocolProtos.SyncNodeProtocolService;
+import org.apache.hadoop.hdfs.protocolPB.*;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -237,6 +233,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
     BlockingService dnProtoPbService = DatanodeProtocolService
         .newReflectiveBlockingService(dnProtoPbTranslator);
 
+    SyncNodeProtocolServerSideTranslatorPB snProtoPbTranslator =
+        new SyncNodeProtocolServerSideTranslatorPB(this);
+    BlockingService snProtoPbService = SyncNodeProtocolService
+        .newReflectiveBlockingService(snProtoPbTranslator);
+
     NamenodeProtocolServerSideTranslatorPB namenodeProtocolXlator = 
         new NamenodeProtocolServerSideTranslatorPB(this);
     BlockingService NNPbService = NamenodeProtocolService
@@ -308,6 +309,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
           serviceRpcServer);
       DFSUtil.addPBProtocol(conf, DatanodeProtocolPB.class, dnProtoPbService,
           serviceRpcServer);
+      DFSUtil.addPBProtocol(conf, SyncNodeProtocolPB.class, snProtoPbService,
+          serviceRpcServer);
       DFSUtil.addPBProtocol(conf, RefreshAuthorizationPolicyProtocolPB.class,
           refreshAuthService, serviceRpcServer);
       DFSUtil.addPBProtocol(conf, RefreshUserMappingsProtocolPB.class, 
@@ -352,6 +355,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
     DFSUtil.addPBProtocol(conf, NamenodeProtocolPB.class, NNPbService,
         clientRpcServer);
     DFSUtil.addPBProtocol(conf, DatanodeProtocolPB.class, dnProtoPbService,
+        clientRpcServer);
+    DFSUtil.addPBProtocol(conf, SyncNodeProtocolPB.class, snProtoPbService,
         clientRpcServer);
     DFSUtil.addPBProtocol(conf, RefreshAuthorizationPolicyProtocolPB.class, 
         refreshAuthService, clientRpcServer);
