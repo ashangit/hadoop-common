@@ -864,9 +864,10 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    *  until the first output stream is created. The same instance will
    *  be returned until all output streams are closed.
    */
-  public LeaseRenewer getLeaseRenewer() throws IOException {
+  public LeaseRenewer getLeaseRenewer() {
       return LeaseRenewer.getInstance(authority, ugi, this);
-  }
+
+    }
 
   /** Get a lease and start automatic renewal */
   private void beginFileLease(final long inodeId, final DFSOutputStream out)
@@ -875,7 +876,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   }
 
   /** Stop renewal of lease for the file. */
-  void endFileLease(final long inodeId) throws IOException {
+  void endFileLease(final long inodeId) {
     getLeaseRenewer().closeFile(inodeId, this);
   }
     

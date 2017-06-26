@@ -919,7 +919,7 @@ public class DFSOutputStream extends FSOutputSummer
       closeResponder();       // close and join
       closeStream();
       streamerClosed = true;
-      setClosed();
+      release();
       synchronized (dataQueue) {
         dataQueue.notifyAll();
       }
@@ -2556,11 +2556,6 @@ public class DFSOutputStream extends FSOutputSummer
         ioes.add(e);
       }
     }
-    try {
-      dfsClient.endFileLease(fileId);
-    } catch (IOException e) {
-      ioes.add(e);
-    }
     final IOException ioe = MultipleIOException.createIOException(ioes);
     if (ioe != null) {
       throw ioe;
@@ -2568,17 +2563,26 @@ public class DFSOutputStream extends FSOutputSummer
   }
 
   boolean isClosed() {
-    return closed;
+    return closed || getStreamer().streamerClosed;
   }
 
   void setClosed() {
     closed = true;
+    dfsClient.endFileLease(fileId);
+    release();
+  }
+
+  /**
+   * release the DFSPackets in the two queues
+   *
+   */
+  void release() {
     synchronized (dataQueue) {
       releaseBuffer(dataQueue, byteArrayManager);
       releaseBuffer(ackQueue, byteArrayManager);
     }
   }
-  
+
   private static void releaseBuffer(List<Packet> packets, ByteArrayManager bam) {
     for(Packet p : packets) {
       p.releaseBuffer(bam);
@@ -2588,7 +2592,7 @@ public class DFSOutputStream extends FSOutputSummer
 
   // shutdown datastreamer and responseprocessor threads.
   // interrupt datastreamer if force is true
-  private void closeThreads(boolean force) throws IOException {
+  protected void closeThreads(boolean force) throws IOException {
     try {
       streamer.close(force);
       streamer.join();
@@ -2621,11 +2625,6 @@ public class DFSOutputStream extends FSOutputSummer
       } finally {
         scope.close();
       }
-    }
-    try {
-      dfsClient.endFileLease(fileId);
-    } catch (IOException e) {
-      ioes.add(e);
     }
     final IOException ioe = MultipleIOException.createIOException(ioes);
     if (ioe != null) {
