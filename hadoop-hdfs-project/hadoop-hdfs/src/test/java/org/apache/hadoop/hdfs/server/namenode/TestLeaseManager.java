@@ -17,25 +17,35 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import com.google.common.collect.Lists;
 import org.junit.Test;
-import org.mockito.Mockito;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 import java.util.ArrayList;
 
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.*;
 
 public class TestLeaseManager {
+  @Rule
+  public Timeout timeout = new Timeout(300000);
+
+  private static final long GRANDFATHER_INODE_ID = 0;
 
   public static long maxLockHoldToReleaseLeaseMs = 100;
   
@@ -59,7 +69,7 @@ public class TestLeaseManager {
 
   /** Check that LeaseManager.checkLease release some leases
    */
-  @Test (timeout=30000)
+  @Test
   public void testCheckLease() throws InterruptedException {
     LeaseManager lm = new LeaseManager(makeMockFsNameSystem());
     final long expiryTime = 0;
@@ -81,15 +91,31 @@ public class TestLeaseManager {
     assertTrue(lm.countLease() < numLease);
   }
 
-  private static FSNamesystem makeMockFsNameSystem() {
-    FSDirectory dir = mock(FSDirectory.class);
-    FSNamesystem fsn = mock(FSNamesystem.class);
-    when(fsn.isRunning()).thenReturn(true);
-    when(fsn.hasReadLock()).thenReturn(true);
-    when(fsn.hasWriteLock()).thenReturn(true);
-    when(fsn.getFSDirectory()).thenReturn(dir);
-    when(fsn.getMaxLockHoldToReleaseLeaseMs()).thenReturn(maxLockHoldToReleaseLeaseMs);
-    return fsn;
+  @Test
+  public void testCountPath() {
+    LeaseManager lm = new LeaseManager(makeMockFsNameSystem());
+
+    lm.addLease("holder1", 1);
+    assertThat(lm.countPath(), is(1L));
+
+    lm.addLease("holder2", 2);
+    assertThat(lm.countPath(), is(2L));
+    lm.addLease("holder2", 2);                   // Duplicate addition
+    assertThat(lm.countPath(), is(2L));
+
+    assertThat(lm.countPath(), is(2L));
+
+    // Remove a couple of non-existing leases. countPath should not change.
+    lm.removeLease("holder2", stubInodeFile(3));
+    lm.removeLease("InvalidLeaseHolder", stubInodeFile(1));
+    assertThat(lm.countPath(), is(2L));
+
+    INodeFile file = stubInodeFile(1);
+    lm.reassignLease(lm.getLease(file), file, "holder2");
+    assertThat(lm.countPath(), is(2L));          // Count unchanged on reassign
+
+    lm.removeLease("holder2", stubInodeFile(2)); // Remove existing
+    assertThat(lm.countPath(), is(1L));
   }
 
   /**
@@ -129,5 +155,24 @@ public class TestLeaseManager {
         cluster.shutdown();
       }
     }
+  }
+
+  private static FSNamesystem makeMockFsNameSystem() {
+    FSDirectory dir = mock(FSDirectory.class);
+    FSNamesystem fsn = mock(FSNamesystem.class);
+    when(fsn.isRunning()).thenReturn(true);
+    when(fsn.hasReadLock()).thenReturn(true);
+    when(fsn.hasWriteLock()).thenReturn(true);
+    when(fsn.getFSDirectory()).thenReturn(dir);
+    when(fsn.getMaxLockHoldToReleaseLeaseMs()).thenReturn(maxLockHoldToReleaseLeaseMs);
+    return fsn;
+  }
+
+  private static INodeFile stubInodeFile(long inodeId) {
+    PermissionStatus p = new PermissionStatus(
+            "dummy", "dummy", new FsPermission((short) 0777));
+    return new INodeFile(
+            inodeId, new String("foo-" + inodeId).getBytes(), p, 0L, 0L,
+            BlockInfo.EMPTY_ARRAY, (short) 1, 1L);
   }
 }
